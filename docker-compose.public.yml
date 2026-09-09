@@ -1,0 +1,28 @@
+# Открытый показ — без пароля.
+#
+# Отдельный файл, потому что это отдельное решение: подключается вместо
+# docker-compose.publish.yml и снимает basic-auth. Стенд при этом должен быть в
+# режиме MBP_DISCLOSURE=public — тогда он показывает, но не редактирует:
+# прогоны удалять нельзя и пути корпусов на хосте не отдаются.
+#
+# ВНИМАНИЕ: первый выпуск сертификата навсегда публикует имя домена в
+# Certificate Transparency. Сканеры приходят в течение секунд.
+
+services:
+  playground:
+    networks:
+      - private
+      - edge
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${MBP_EDGE_NETWORK:-edge}"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.rule=Host(`${MBP_DOMAIN:?нужен домен}`)"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.entrypoints=websecure"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.service=${MBP_NAME:-mb}-playground"
+      - "traefik.http.services.${MBP_NAME:-mb}-playground.loadbalancer.server.port=8000"
+
+networks:
+  edge:
+    name: ${MBP_EDGE_NETWORK:-edge}
+    external: true

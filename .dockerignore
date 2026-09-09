@@ -1,0 +1,7 @@
+.git
+data/corpora/*.txt
+var/
+docs/
+*.md
+!README.md
+.env*

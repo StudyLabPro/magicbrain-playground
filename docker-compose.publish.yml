@@ -1,0 +1,34 @@
+# Публикация наружу — отдельный файл, потому что это отдельное решение.
+#
+# Подключается только когда MBP_TRAEFIK_ENABLE=true (Makefile добавляет `-f`
+# сам). Пока он не подключён, стенд не состоит в сети обратного прокси, и
+# снаружи к нему нет пути в принципе.
+#
+# ВНИМАНИЕ: первое включение маршрута необратимо раскрывает имя домена —
+# Let's Encrypt публикует его в Certificate Transparency, и сканеры приходят в
+# течение секунд. См. docs/DEPLOY.md, раздел «Что необратимо».
+
+services:
+  playground:
+    networks:
+      - private
+      - edge
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${MBP_EDGE_NETWORK:-edge}"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.rule=Host(`${MBP_DOMAIN:?нужен домен}`)"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.entrypoints=websecure"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.service=${MBP_NAME:-mb}-playground"
+      - "traefik.http.services.${MBP_NAME:-mb}-playground.loadbalancer.server.port=8000"
+      # Закрыт паролем и убран из индексации. MBP_AUTH_MIDDLEWARE обязательна:
+      # если её нет, compose откажется стартовать, а не поднимет стенд без
+      # пароля. Открытый показ без пароля — docker-compose.public.yml, и это
+      # отдельное осознанное решение, а не пустая переменная.
+      - "traefik.http.middlewares.${MBP_NAME:-mb}-playground-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow, noarchive"
+      - "traefik.http.routers.${MBP_NAME:-mb}-playground.middlewares=${MBP_AUTH_MIDDLEWARE:?нужно имя middleware с basic-auth},${MBP_NAME:-mb}-playground-noindex"
+
+networks:
+  edge:
+    name: ${MBP_EDGE_NETWORK:-edge}
+    external: true

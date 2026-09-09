@@ -1,0 +1,79 @@
+[
+  {
+    "id": "rachinsky_ru",
+    "title": "С. А. Рачинский. 1001 задача для умственного счёта",
+    "lang": "ru",
+    "kind": "gutenberg",
+    "chars": 119951,
+    "bytes": 200667,
+    "vocab_size": 88,
+    "sha256": "6c3634334a719979430eab8d0a8803204e418c7be8b97c89123e2738de5a5ce1",
+    "data_class": "D0",
+    "license": "public domain (автор ум. 1902; врезки Project Gutenberg вырезаны)",
+    "url": "https://www.gutenberg.org/cache/epub/16527/pg16527.txt"
+  },
+  {
+    "id": "moskoviya_ru",
+    "title": "П. Н. Апостол. Московия в представлении иностранцев XVI-XVII в.",
+    "lang": "ru",
+    "kind": "gutenberg",
+    "chars": 45389,
+    "bytes": 80826,
+    "vocab_size": 154,
+    "sha256": "2bf1d3a0960a2b620fe3eda4caa69bdf31e1fa0ac1293f7155693d346699afe5",
+    "data_class": "D0",
+    "license": "public domain (издание 1918 г.; врезки Project Gutenberg вырезаны)",
+    "url": "https://www.gutenberg.org/cache/epub/30774/pg30774.txt"
+  },
+  {
+    "id": "shakespeare_en",
+    "title": "William Shakespeare, selected plays (tiny-shakespeare)",
+    "lang": "en",
+    "kind": "plain",
+    "chars": 119992,
+    "bytes": 119992,
+    "vocab_size": 61,
+    "sha256": "2f807f587cc7eb8da5ce0be63eaf7984a7e407d417fa01c7f647ab136a5ead8c",
+    "data_class": "D0",
+    "license": "public domain (Шекспир, ум. 1616); файл-агрегат из char-rnn, MIT",
+    "url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
+  },
+  {
+    "id": "balansis_docs_en",
+    "title": "Balansis: собственная документация экосистемы (AGPL-3.0, публичный репозиторий)",
+    "lang": "en",
+    "kind": "repo",
+    "chars": 30602,
+    "bytes": 30792,
+    "vocab_size": 98,
+    "sha256": "c69c4ed32cb2d7d1faebe027ee0961572b19266cb5cc5ec7d73f6a10ee16f06e",
+    "data_class": "D1",
+    "license": "собственный код экосистемы; репозиторий StudyLabPro/Balansis публичный",
+    "paths": [
+      "Balansis/README.md",
+      "Balansis/ROADMAP.md",
+      "Balansis/CHANGELOG.md",
+      "Balansis/docs/index.md",
+      "Balansis/docs/glossary.md"
+    ]
+  },
+  {
+    "id": "synthetic_markov",
+    "title": "Синтетическая марковская цепь (сгенерирована этим скриптом)",
+    "lang": "synthetic",
+    "kind": "synthetic",
+    "chars": 80001,
+    "bytes": 147348,
+    "vocab_size": 22,
+    "sha256": "5343ae5a662998e52dc409fd7eeb76347516c0189165bdef11ea343607a803e3",
+    "data_class": "D2",
+    "license": "сгенерировано этим скриптом, реальных данных не содержит",
+    "source_entropy_nats_per_char": 0.7983,
+    "source_entropy_details": {
+      "chain_nats_per_step": 0.9538,
+      "separator_nats_per_step": 0.9408,
+      "mean_chars_per_step": 2.3733,
+      "empirical_nats_per_char": 0.7991
+    }
+  }
+]

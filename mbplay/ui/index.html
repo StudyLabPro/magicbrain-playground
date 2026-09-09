@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>MagicBrain Playground</title>
+<link rel="stylesheet" href="/ui/styles.css">
+</head>
+<body>
+<header>
+  <h1>MagicBrain Playground</h1>
+  <span class="meta" id="meta">загрузка…</span>
+</header>
+
+<nav>
+  <button data-tab="train" class="active">Обучение</button>
+  <button data-tab="neurogenesis">Нейрогенез</button>
+  <button data-tab="repair">Самовосстановление</button>
+  <button data-tab="act">ACT / Balansis</button>
+  <button data-tab="runs">Прогоны</button>
+  <button data-tab="corpora">Корпуса</button>
+</nav>
+
+<main>
+  <!-- ОБУЧЕНИЕ -->
+  <section class="tab active" id="tab-train">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>Обучить сеть на тексте</h2>
+          <label>Корпус</label>
+          <select id="train-corpus"></select>
+          <label>Свой текст (перебивает корпус, если заполнен)</label>
+          <textarea id="train-text" placeholder="вставьте текст, минимум 200 символов"></textarea>
+          <div class="row">
+            <div><label>Шагов</label><input id="train-steps" type="number" value="30000" min="200"></div>
+            <div><label>Символов</label><input id="train-chars" type="number" value="60000" min="200"></div>
+          </div>
+          <label>Геном</label>
+          <input id="train-genome" value="30121033102301230112332100123">
+          <div class="row">
+            <div><label>Seed (пусто = из генома)</label><input id="train-seed" placeholder=""></div>
+            <div><label>ACT</label>
+              <select id="train-act"><option value="false">выключен</option><option value="true">включён</option></select>
+            </div>
+          </div>
+          <button class="go" id="train-go">Запустить</button>
+          <div class="progress"><div id="train-bar"></div></div>
+          <div class="status" id="train-status"></div>
+        </div>
+      </div>
+      <div id="train-result"><div class="card"><h2>Как читать результат</h2><p class="note">Сеть учится предсказывать следующий символ. Обучающий loss сам по себе
+      ничего не доказывает — сеть может просто запомнить строку, поэтому хвост текста
+      отрезается и в обучении не участвует.</p>
+    <p class="note">На нём считаются три опорные модели: равномерная (ln V), униграммная
+      (частоты символов) и биграммная (марковская первого порядка). Вопрос, на который
+      отвечает прогон: <b>обгоняет ли сеть униграмму и биграмму</b>. Всё, что выше
+      биграммы, означает, что сеть не выучила даже парных зависимостей.</p>
+    <p class="note">Ниже появятся таблица сравнения, кривая обучения, состояние субстрата
+      (частота разрядов, средняя |W|) и сгенерированный образец текста. Модель
+      сохраняется и её можно отдать в штатный MagicBrain API.</p></div></div>
+    </div>
+  </section>
+
+  <!-- НЕЙРОГЕНЕЗ -->
+  <section class="tab" id="tab-neurogenesis">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>Пайплайн нейрогенеза</h2>
+          <p class="note">Компиляция генома из статистики текста → морфогенез → обучение → воспроизведение → оценка.</p>
+          <label>Корпус</label>
+          <select id="ng-corpus"></select>
+          <div class="row">
+            <div><label>Стратегия</label>
+              <select id="ng-strategy">
+                <option value="statistical">statistical</option>
+                <option value="hash">hash</option>
+                <option value="hybrid">hybrid</option>
+                <option value="auto">auto</option>
+              </select>
+            </div>
+            <div><label>Длина генома</label><input id="ng-len" type="number" value="28" min="24" max="64"></div>
+          </div>
+          <div class="row">
+            <div><label>Шагов</label><input id="ng-steps" type="number" value="30000" min="200"></div>
+            <div><label>Символов</label><input id="ng-chars" type="number" value="40000" min="200"></div>
+          </div>
+          <div class="row">
+            <div><label>CPPN</label>
+              <select id="ng-cppn"><option value="true">включён</option><option value="false">выключен</option></select>
+            </div>
+            <div><label>Проб аттракторов</label><input id="ng-probes" type="number" value="100" min="0" max="500"></div>
+          </div>
+          <button class="go" id="ng-go">Запустить</button>
+          <div class="progress"><div id="ng-bar"></div></div>
+          <div class="status" id="ng-status"></div>
+        </div>
+      </div>
+      <div id="ng-result"><div class="card"><h2>Что здесь происходит</h2><p class="note">Пять стадий вызываются по отдельности, поэтому у каждой своё время и свои
+      метрики: геном компилируется из статистики текста, из генома разворачивается ткань
+      (позиции, связи, веса из CPPN, созревание порогов), ткань обучается, из обученной
+      сети авторегрессивно воспроизводится текст, и воспроизведение оценивается.</p>
+    <p class="note"><b>Чего здесь нет:</b> роста числа нейронов во время обучения. N задан
+      геномом и не меняется — меняются только рёбра. И <b>сжатия</b> тоже нет:
+      genome_ratio — это отношение длины генома к размеру данных, а не коэффициент
+      сжатия, потому что обратного преобразования с гарантией не существует. Рядом
+      показаны gzip/bz2/lzma именно как напоминание, что величины разные.</p></div></div>
+    </div>
+  </section>
+
+  <!-- САМОВОССТАНОВЛЕНИЕ -->
+  <section class="tab" id="tab-repair">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>Повреждение и восстановление</h2>
+          <label>Взять обученную сеть из прогона</label>
+          <select id="rp-base"><option value="">— обучить заново —</option></select>
+          <label>Корпус (если обучаем заново)</label>
+          <select id="rp-corpus"></select>
+          <div class="row">
+            <div><label>Предобучение, шагов</label><input id="rp-pre" type="number" value="20000" min="200"></div>
+            <div><label>Восстановление, шагов</label><input id="rp-rec" type="number" value="8000" min="200"></div>
+          </div>
+          <label>Доли повреждения (через запятую)</label>
+          <input id="rp-fracs" value="0.1, 0.2, 0.4">
+          <button class="go" id="rp-go">Запустить</button>
+          <div class="progress"><div id="rp-bar"></div></div>
+          <div class="status" id="rp-status"></div>
+        </div>
+      </div>
+      <div id="rp-result"><div class="card"><h2>Что меряется</h2><p class="note">Обученная сеть перечитывается с диска перед каждым повреждением, поэтому
+      разные доли сравнимы между собой. Качество меряется на отложенном хвосте до удара,
+      сразу после и по ходу дообучения.</p>
+    <p class="note">Цель повреждения важна. Штатное <code>damage_edges</code> обнуляет
+      рекуррентные синапсы — и оказывается, что предсказание от этого почти не страдает:
+      ответ формирует линейный readout, которого такое повреждение не касается. Режим
+      <code>readout</code> бьёт именно по нему, и там просадка видна сразу.</p></div></div>
+    </div>
+  </section>
+
+  <!-- ACT -->
+  <section class="tab" id="tab-act">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>С ACT-бэкендом и без него</h2>
+          <p class="note">Один геном, один seed, один текст. Меряются качество, скорость и численный дрейф.</p>
+          <label>Корпус</label>
+          <select id="act-corpus"></select>
+          <div class="row">
+            <div><label>Шагов (на каждую сторону)</label><input id="act-steps" type="number" value="10000" min="200"></div>
+            <div><label>Символов</label><input id="act-chars" type="number" value="40000" min="200"></div>
+          </div>
+          <label>Seed</label><input id="act-seed" value="20260908">
+          <button class="go" id="act-go">Запустить</button>
+          <div class="progress"><div id="act-bar"></div></div>
+          <div class="status" id="act-status"></div>
+        </div>
+      </div>
+      <div id="act-result"><div class="card"><h2>Три разные вещи, которые легко перепутать</h2><p class="note">1. <b>Обучение.</b> Один геном, один seed, один текст — две арифметики.
+      Сравниваются качество на отложенном хвосте и время.</p>
+    <p class="note">2. <b>Дрейф компенсации</b> по ходу обучения: насколько компенсированная
+      сумма весов расходится с наивной.</p>
+    <p class="note">3. <b>Микробенчмарк</b> на специально плохо обусловленных данных, эталон
+      <code>math.fsum</code>. Это и есть то, за что платят временем. На весах сети масштаба
+      N≈1000 такого разброса величин нет, и прогон это показывает, а не скрывает.</p></div></div>
+    </div>
+  </section>
+
+  <!-- ПРОГОНЫ -->
+  <section class="tab" id="tab-runs">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>Сохранённые прогоны</h2>
+          <p class="note">Каждый прогон — файл JSON на диске. Переживает перезапуск, открывается повторно, выгружается целиком.</p>
+          <button class="small" id="runs-refresh">Обновить</button>
+          <div class="runlist"><table id="runs-table"><tbody></tbody></table></div>
+        </div>
+      </div>
+      <div id="runs-result"><div class="card"><h2>Прогоны переживают перезапуск</h2><p class="note">Каждый прогон — файл JSON в <code>var/runs</code>: параметры,
+      происхождение данных с sha256, версия кода MagicBrain, все кривые и метрики.
+      Клик по строке открывает прогон на вкладке его сценария; кнопка «Скачать JSON»
+      отдаёт файл целиком.</p>
+    <p class="note">Модель прогона обучения лежит рядом в <code>var/models</code> и видна
+      соседнему контейнеру со штатным MagicBrain API.</p></div></div>
+    </div>
+  </section>
+
+  <!-- КОРПУСА -->
+  <section class="tab" id="tab-corpora">
+    <div class="card">
+      <h2>Корпуса и происхождение данных</h2>
+      <p class="note">D0 — публичное достояние, D1 — собственные материалы экосистемы, D2 — синтетика.
+      Продуктовая телеметрия учеников здесь не используется и использоваться не может.</p>
+      <table id="corpora-table"></table>
+    </div>
+    <div class="card" id="corpus-preview" style="display:none"></div>
+  </section>
+</main>
+
+<script src="/ui/app.js"></script>
+</body>
+</html>

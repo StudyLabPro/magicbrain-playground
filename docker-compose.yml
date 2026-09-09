@@ -1,0 +1,141 @@
+# Плейграунд MagicBrain: стенд из двух контейнеров одного образа.
+#
+# Два контейнера из одного образа: сам плейграунд (обучение, нейрогенез,
+# самовосстановление, сравнение с ACT) и штатный MagicBrain API — чтобы
+# обученную модель можно было отдать в реальный рантайм, а не только
+# посмотреть на графике.
+#
+# Сеть у стека своя и отдельная: соседние контейнеры хоста его не видят.
+# Для локальных проверок открыты порты на 127.0.0.1.
+# Внешний маршрут через обратный прокси живёт в отдельном файле
+# docker-compose.publish.yml и подключается только вместе с решением о
+# публикации — до тех пор плейграунд вообще не подключён к общей сети хоста.
+#
+# Суммарный бюджет: 4 vCPU и 6 GB на оба контейнера.
+
+x-image: &image magicbrain-playground:${MBP_BUILD_ID:-local}
+
+x-build: &build
+  context: .
+  dockerfile: Dockerfile
+
+services:
+  playground:
+    build: *build
+    image: *image
+    container_name: ${MBP_NAME:-mb}-playground
+    restart: unless-stopped
+    command: ["uvicorn", "mbplay.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    environment:
+      MBP_DATA_DIR: /data
+      MBP_CORPORA_DIR: /corpora
+      MBP_MB_API_URL: http://mb-api:8000
+      MBP_MAX_WORKERS: ${MBP_MAX_WORKERS:-2}
+      MBP_MAX_STEPS: ${MBP_MAX_STEPS:-200000}
+      MBP_MAX_CHARS: ${MBP_MAX_CHARS:-200000}
+      MBP_MAX_RUNS: ${MBP_MAX_RUNS:-500}
+      # internal — доступны все сценарии; public — нейрогенез и геномы скрыты.
+      # Неизвестное значение — отказ на старте, а не «показать всё».
+      MBP_DISCLOSURE: ${MBP_DISCLOSURE:-internal}
+      MBP_MB_CODE_SHA: ${MBP_MB_CODE_SHA:-unknown}
+      MBP_MB_CODE_DIRTY: ${MBP_MB_CODE_DIRTY:-unknown}
+      MBP_BUILD_ID: ${MBP_BUILD_ID:-local}
+      MBP_PLAYGROUND_SHA: ${MBP_PLAYGROUND_SHA:-unknown}
+      MBP_PLAYGROUND_DIRTY: ${MBP_PLAYGROUND_DIRTY:-unknown}
+      # numpy сам по себе многопоточный; ограничиваем, чтобы два
+      # параллельных прогона не разошлись по всем ядрам хоста.
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    volumes:
+      - ./var:/data
+      - ./data/corpora:/corpora:ro
+    ports:
+      - "127.0.0.1:${MBP_PORT:-8007}:8000"
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "3.0"
+          memory: 4500M
+          pids: 256
+    labels:
+      traefik.enable: "false"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  mb-api:
+    # Тот же образ и тот же контекст сборки: без секции build запуск на
+    # свежесобранном теге уходил бы в pull несуществующего образа и валил
+    # весь `docker compose up`.
+    build: *build
+    image: *image
+    container_name: ${MBP_NAME:-mb}-api
+    restart: unless-stopped
+    command: ["uvicorn", "api.app.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    environment:
+      MODEL_STORAGE_PATH: /data/models
+      PROJECT_NAME: MagicBrainAPI
+      VERSION: ${MBP_BUILD_ID:-local}
+      BACKEND_CORS_ORIGINS: '["http://localhost:${MBP_PORT:-8007}"]'
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    volumes:
+      - ./var:/data
+    ports:
+      - "127.0.0.1:${MBP_API_PORT:-8008}:8000"
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1500M
+          pids: 256
+    labels:
+      traefik.enable: "false"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+networks:
+  # Своя отдельная сеть: у mb-api нет авторизации, и в общей сети хоста его
+  # разрушающие эндпоинты (удаление моделей, запуск обучения) были бы доступны
+  # каждому соседнему контейнеру — их там восемь, включая review-контейнеры
+  # чужих проектов.
+  #
+  # `internal: true` здесь не годится: на внутренней сети Docker не публикует
+  # порты вовсе (проверено — контейнер поднимается, но 127.0.0.1:8007 не
+  # слушается), а локальные проверки и `make smoke` ходят именно туда.
+  # Изоляцию от соседей даёт сам факт отдельной сети, а не запрет егресса.
+  private:
+    name: ${MBP_NAME:-mb}play-private

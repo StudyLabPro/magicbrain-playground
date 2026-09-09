@@ -1,0 +1,815 @@
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/StudyLabPro/Balansis)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
+[![Coverage](https://img.shields.io/badge/coverage-85%25%2B-brightgreen.svg)](https://github.com/StudyLabPro/Balansis)
+[![Lean4](https://img.shields.io/badge/Lean4-A1--A5%2C%20E1--E4%2C%20S1--S3%20proved-blueviolet.svg)](./formal/)
+[![License](https://img.shields.io/badge/license-AGPL--3.0%20%2F%20Commercial-blue.svg)](./LICENSING.md)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+# Balansis
+
+**Balansis is a scientific and engineering Python library for workloads where
+plain floating-point arithmetic hides instability instead of making it explicit.**
+
+It is built around **Absolute Compensation Theory (ACT)**: a numerical model
+that introduces structured runtime objects such as `AbsoluteValue`,
+`ABSOLUTE`, and `EternalRatio`, and exposes compensation directly in the API
+instead of silently discarding it.
+
+[Documentation](docs/index.md) | [Quick Start](docs/getting-started/quickstart.md) | [API Reference](docs/api/index.md) | [Formal Verification](docs/formal/overview.md) | [Examples](examples/README.md) | [Benchmarks](benchmarks/README.md)
+
+---
+
+## What Problem Does Balansis Solve?
+
+IEEE 754 floating-point arithmetic is fast and ubiquitous, but several failure
+patterns still matter in real systems:
+
+- large reductions lose small but meaningful residuals
+- catastrophic cancellation turns uncertain differences into misleading zeros
+- divide-by-zero handling is deferred to edge-case logic instead of the data model
+- financial and simulation pipelines often hide correction logic outside the core arithmetic API
+
+Balansis is for cases where you want those edge conditions to be **visible,
+structured, and auditable**.
+
+## Why Was It Created?
+
+Balansis was created to explore a stronger arithmetic interface for:
+
+- scientific computations with unstable reductions
+- long-running simulations with drift-sensitive accumulation
+- financial workflows that benefit from structural cancellation semantics
+- research pipelines that want a bridge from runtime code to formal proofs
+
+---
+
+## Real-World Value First
+
+### 1. Large-Scale Aggregation
+
+```python
+sum([1e16, 1.0, -1e16]) # IEEE 754 / Python float
+# 0.0
+```
+
+```python
+from balansis import AbsoluteValue as Bv, Operations
+
+values = [
+ Bv.from_float(1e16),
+ Bv.from_float(1.0),
+ Bv.from_float(-1e16),
+]
+result, compensation = Operations.sequence_sum(values)
+# result == AbsoluteValue.from_float(1.0)
+# compensation > 0.0
+```
+
+Why it matters: the small residual survives, and the API exposes that a
+meaningful correction was applied.
+
+### 2. Catastrophic Cancellation
+
+```python
+(1e16 + 1.0) - 1e16 # IEEE 754 / Python float
+# 0.0
+```
+
+```python
+from balansis import AbsoluteValue as Bv, Operations
+
+a = Bv.from_float(1e16)
+b = Bv.from_float(-1e16)
+result, compensation = Operations.compensated_add(a, b)
+```
+
+Why it matters: when precision loss is suspected at very large magnitudes,
+Balansis preserves an informative residual instead of always collapsing to a
+spurious exact zero.
+
+### 3. Financial Cancellation
+
+```python
+from decimal import Decimal
+from balansis.finance.ledger import Ledger
+
+ledger = Ledger()
+ledger.post_entry("cash", Decimal("250.00"))
+ledger.post_entry("cash", Decimal("-250.00"))
+
+balance = ledger.balance()
+# balance == ABSOLUTE
+```
+
+Why it matters: offsetting entries cancel structurally to the ACT identity,
+which is easier to reason about than burying bookkeeping semantics in plain
+float totals.
+
+### 4. Division Edge Handling
+
+```python
+1.0 / 0.0 # standard runtime edge case
+# ZeroDivisionError
+```
+
+```python
+from balansis import AbsoluteValue, Operations
+
+num = AbsoluteValue.from_float(6.0)
+den = AbsoluteValue.from_float(2.0)
+ratio, compensation = Operations.compensated_divide(num, den)
+```
+
+Why it matters: Balansis makes ratio structure explicit through `EternalRatio`
+for valid denominators and rejects an `ABSOLUTE` denominator directly instead of
+pretending that infinity-like behavior is a normal value.
+
+---
+
+## Why Adopt Balansis?
+
+- **Explicit compensation:** low-level operations return both a result and a compensation factor
+- **Structured edge handling:** ratio and additive-identity behavior are part of the model, not scattered ad hoc checks
+- **Research continuity:** the repository includes a Lean4 formal layer for the public ACT theorem surface
+- **Practical scope:** core arithmetic, algebraic structures, linear algebra, finance helpers, and experimental subprojects
+
+---
+
+## Install In 60 Seconds
+
+```bash
+pip install balansis
+```
+
+CLI / pipx install:
+
+```bash
+pipx install balansis
+balansis --version
+balansis doctor
+```
+
+Optional extras:
+
+```bash
+pip install balansis[plot]
+pip install balansis[notebook]
+pip install balansis[torch]
+pip install balansis[all]
+```
+
+Supported Python versions: 3.10, 3.11, 3.12.
+
+More install options: [Installation Guide](docs/getting-started/installation.md)
+
+---
+
+## Quick Start
+
+```python
+from balansis import AbsoluteValue, Operations, ABSOLUTE
+
+a = AbsoluteValue(magnitude=5.0, direction=1)
+b = AbsoluteValue(magnitude=3.0, direction=-1)
+
+result, compensation = Operations.compensated_add(a, b)
+
+print(result)
+print(compensation)
+print(ABSOLUTE)
+```
+
+Continue with:
+
+- [Quick Start](docs/getting-started/quickstart.md)
+- [Glossary](docs/glossary.md)
+- [Examples](examples/README.md)
+
+---
+
+## Documentation By Audience
+
+| Audience | Start here | Why |
+|----------|------------|-----|
+| Decision makers | [Why Balansis](docs/getting-started/why-balansis.md) | Understand the problem, the value proposition, and where Balansis fits |
+| Developers | [Quick Start](docs/getting-started/quickstart.md) | Install the package and start using the runtime surface |
+| Researchers | [Mathematics](docs/mathematics/index.md) | Explore ACT concepts, notation, and theorem-oriented material |
+| Verification-oriented readers | [Formal Verification](docs/formal/overview.md) | Review the Lean architecture and current proof status |
+| Contributors | [Contributing](CONTRIBUTING.md) | Set up the repo, quality gates, and documentation workflow |
+
+## Documentation Map
+
+- [Documentation Home](docs/index.md)
+- [Getting Started](docs/getting-started/why-balansis.md)
+- [Core Concepts](docs/concepts/index.md)
+- [Architecture](docs/architecture/repository-map.md)
+- [API Reference](docs/api/index.md)
+- [Mathematics](docs/mathematics/index.md)
+- [Formal Verification](docs/formal/overview.md)
+- [Examples](docs/examples/index.md)
+- [Benchmarks](docs/benchmarks/index.md)
+- [TNSIM Overview](docs/tnsim/overview.md)
+- [Research Materials](docs/research/index.md)
+
+---
+
+## Formal Verification Status
+
+Version `1.1.0` ships a compiled Lean4 formalization on Mathlib `v4.28.0`.
+
+- `BalansisFormal` is the constructive core
+- `ACT` is the public theorem facade
+- `formal/` contains **0 `axiom`, 0 `sorry`, 0 `admit`**
+- public theorem groups A1-A5, E1-E4, and S1-S3 are compiled as Lean theorems
+
+Verification entrypoints:
+
+- [Formal Overview](docs/formal/overview.md)
+- [Lean README](formal/README.md)
+
+---
+
+## Package Surface
+
+Core areas currently present in the repository:
+
+- `balansis.core`
+- `balansis.algebra`
+- `balansis.linalg`
+- `balansis.finance`
+- `balansis.numpy_integration`
+- `balansis.ml`
+- `balansis.sets`
+
+Reader-oriented API navigation starts here: [API Reference](docs/api/index.md)
+
+---
+
+## TNSIM
+
+`tnsim/` is a repository subproject for zero-sum infinite sets experimentation.
+It is maintained in the same repository, but it is **not** the main `balansis`
+package entrypoint.
+
+- [TNSIM Overview](docs/tnsim/overview.md)
+- [TNSIM README](tnsim/README.md)
+
+---
+
+## Contributing
+
+Contributions are welcome, but Balansis is maintained under a dual-license
+model. Before opening a substantial pull request, read:
+
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CLA.md](CLA.md)
+- [LICENSING.md](LICENSING.md)
+- [NOTICE](NOTICE)
+- [SECURITY.md](SECURITY.md)
+- [Documentation Standards](docs/standards.md)
+
+---
+
+## License
+
+Balansis is dual-licensed:
+
+- [LICENSE](LICENSE): AGPL-3.0
+- [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md): commercial proprietary terms
+- [LICENSING.md](LICENSING.md): routing and selection guide
+
+Commercial execution material:
+
+- [ORDER_FORM_TEMPLATE.md](ORDER_FORM_TEMPLATE.md)
+- [SECURITY.md](SECURITY.md)
+
+Copyright (c) 2024-2026 Andrey Tikhonov (XTeam-Pro). All rights reserved.
+
+---
+
+Balansis is part of the [StudyNinja-Eco](https://github.com/StudyLabPro/StudyNinja-Eco) ecosystem.
+
+# Balansis Project Roadmap
+
+Strategic development plan for Balansis and Absolute Compensation Theory (ACT).
+
+**Last Updated**: 2026-06-11
+**Current Version**: 0.6.1
+
+---
+
+## Current State (Q2 2026)
+
+| Module | Status | Notes |
+|--------|--------|-------|
+| Core types (`AbsoluteValue`, `EternalRatio`) | Stable | Pydantic frozen=True, 45+ operations |
+| Compensated arithmetic | Stable | `compensated_add/mul/div/power`, near-cancellation detection |
+| Runtime algebra helpers (`AbsoluteGroup`, `EternityField`) | Present | Python runtime helpers; theorem-level guarantees are tracked in the formal layer |
+| Lean4 formal proofs | Complete | 0 `sorry`, 0 `axiom`, public `ACT` facade + constructive `BalansisFormal` |
+| Linear algebra (`linalg/`) | Alpha | GEMM, SVD, QR implemented; benchmarks needed |
+| ML optimizer (`ml/optimizer.py`) | Alpha | `EternalOptimizer`, `EternalTorchOptimizer`; needs validation |
+| Finance module (`finance/ledger.py`) | Alpha | Exact cancellation accounting |
+| NumPy integration | Present | `numpy_integration.py`, vectorized ops |
+| Benchmarks | Early docs-ready | methodology and interpretation docs exist; broader published benchmark matrix is still pending |
+| PyPI publication | Not published | Phase 8 target |
+
+---
+
+## Roadmap
+
+### v0.6.1 — "Alignment Release" (completed in Q2 2026)
+
+**Goal**: Remove version/API/documentation drift and restore a coherent public surface.
+
+- Unified versioning on `0.6.1` across library, `tnsim`, formal artifacts, and package metadata
+- Restored compatibility import paths for legacy `tnsim` modules
+- Reintroduced Balansis compatibility symbols used by older integrations
+- Aligned documentation with the active coverage gate and current package state
+
+- **Outcome**: metadata, compatibility shims, and documentation are synchronized.
+
+### v0.7.0 — "Research Ready" (Q3-Q4 2026 target)
+
+**Goal**: Submit ACT paper to arxiv. Validate PyTorch integration.
+
+- `EternalTorchOptimizer` validated on real training runs (eliminate NaN/Inf in >100k step runs)
+- ACT-MagicBrain integration: replace MagicBrain core arithmetic with ACT compensated operations
+- Formal ACT specification package for publication-oriented writing
+- Publication-facing synthesis of the existing Lean4 proof surface
+- Distributed training stability comparison
+
+**Gate criteria**:
+- [ ] arxiv preprint submitted
+- [ ] MagicBrain training stability measurably improved
+- [ ] PyPI package published as `balansis`
+
+### v0.8.0 — "Production" (Q1 2027 target)
+
+**Goal**: Production-ready, used in StudyNinja cognitive simulation.
+
+- Stable API with backwards-compatibility guarantee
+- NumPy drop-in adapter (vectorized ops, dtype support)
+- SciPy integration (linear system solvers, FFT compensation)
+- Memory arena optimization for large-scale computations
+- Complete `sets/eternal_set.py` for zero-sum infinite sets
+- Public benchmark suite with reproducible published result sets
+
+### v1.0.0 — "Mature" (Phase 12 target, late 2027)
+
+**Goal**: Published research, open source community, industrial adoption.
+
+- MAJOR release with long-term support guarantee
+- Published papers in numerical methods / computational math journals
+- IEEE standards comparison study
+- Open source release (aligned with StudyNinja-Eco open source strategy)
+- Community contributions accepted
+
+---
+
+## Research Directions
+
+### Near-term (2026)
+
+1. **Formal verification expansion**
+ - Extend Lean4 proofs to cover compensated operations (not just structural axioms)
+ - Prove convergence bounds for `sequence_sum` vs Kahan
+ - Category theory formalization (AbsoluteGroup as a functor)
+
+2. **Practical applications**
+ - Financial modeling: ledger reconciliation with exact cancellation
+ - Neural network training stability with ACT-compensated gradients
+ - Knowledge graph computation (link prediction with EternalRatio weights)
+
+3. **Comparative analysis**
+ - Benchmarks against MPFR, Python Decimal, GNU Multiple Precision
+ - Edge case analysis: subnormal numbers, catastrophic cancellation scenarios
+
+### Long-term (2027+)
+
+1. **Theory expansion**
+ - Multi-dimensional compensation structures
+ - Stochastic compensation methods
+ - Quantum analogs of ACT
+
+2. **Hardware support**
+ - SIMD-optimized operations
+ - FPGA implementations
+ - GPU kernels (CUDA/ROCm)
+
+3. **New application domains**
+ - Cryptography (exact arithmetic for prime field operations)
+ - Bioinformatics (exact sequence alignment scores)
+
+---
+
+## Architecture
+
+```
+balansis/
+├── core/ # AbsoluteValue, EternalRatio, Operations
+├── logic/ # Compensator and higher-level runtime orchestration
+├── algebra/ # Runtime algebra helpers
+├── linalg/ # GEMM, QR, SVD
+├── ml/ # Optimizer experiments
+├── finance/ # Ledger and finance-oriented helpers
+├── sets/ # Runtime set-oriented helpers
+├── numpy_integration.py # NumPy bridge helpers
+└── memory/ # Arena and memory helpers
+formal/
+├── ACT/ # Public theorem facade
+└── BalansisFormal/ # Constructive proof kernel
+docs/
+├── getting-started/ # Onboarding and quick start
+├── mathematics/ # ACT definitions and algebraic structure
+├── formal/ # Proof overview and proof map
+├── api/ # Code-backed runtime API reference
+├── benchmarks/ # Methodology and interpretation
+├── research/ # Non-canonical research bridge
+└── archive/legacy/ # Historical non-canonical material
+examples/ # Runnable notebooks and example assets
+benchmarks/ # Benchmark code and execution entrypoints
+tnsim/ # Adjacent subproject with its own runtime surface
+```
+
+---
+
+## Integration with MAGIC Ecosystem
+
+Balansis is **Level 1 (MetaBalansis)** in the MAGIC hierarchy — the mathematical foundation.
+
+Key integration points:
+- **MagicBrain (Phase 8)**: Replace SNN weight arithmetic with ACT-compensated operations to eliminate training instability
+- **StudyNinja-API (Phase 9)**: ACT-compensated scoring for assessment and mastery computation
+- **MAGIC SDK**: Confidence score computation using ACT numerics
+
+---
+
+## Quality Standards
+
+| Metric | Current | Target (v0.7.0) | Target (v1.0.0) |
+|--------|---------|-----------------|-----------------|
+| Test coverage | 85%+ (shipped modules) | 90%+ (all modules) | 95%+ (all) |
+| Lean4 public theorem groups proved | A1-A5, E1-E4, S1-S3 | + compensated ops proofs | + convergence bounds |
+| PyPI published | No | No | Yes |
+| Benchmarks | None | vs IEEE 754, Kahan | vs MPFR, Decimal |
+
+Pre-commit checks: Black, isort, flake8, mypy (strict), bandit, codespell, interrogate — enforced in CI.
+
+---
+
+## Documentation Pointers
+
+- Documentation hub: [docs/index.md](docs/index.md)
+- Runtime architecture: [docs/architecture/runtime-architecture.md](docs/architecture/runtime-architecture.md)
+- API reference: [docs/api/index.md](docs/api/index.md)
+- Formal proof map: [docs/formal/proof-map.md](docs/formal/proof-map.md)
+- Research boundary: [docs/research/research-scope.md](docs/research/research-scope.md)
+
+*This roadmap is a living document updated at each phase boundary.*
+
+# Changelog
+
+All notable changes to the Balansis project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [Unreleased]
+
+---
+
+## [1.1.0] — 2026-08-31 — Honest Numerics Edition
+
+This release makes the numerical core genuinely deliver the accuracy the
+whitepaper describes, replaces a placeholder dot-product implementation with a
+correctly-rounded one, adds a real ACT-compensated SVD backend, and aligns all
+research documentation with what the code and the Lean proofs actually verify.
+No patents are pursued; all patent material has been removed.
+
+### Added
+- `balansis/core/_eft.py` — error-free transforms: `two_sum` (Knuth/Møller),
+ `two_product` (Dekker split, FMA-free), `two_product_arr`, and Ogita–Rump–Oishi
+ `dot2` (correctly-rounded dot product via a single `math.fsum` over all
+ high/low product terms) plus `comp_sum`. This is the honest numerical kernel.
+- Genuine ACT-compensated SVD backend `svd(A, method="act_jacobi")`: a one-sided
+ Jacobi SVD whose Gram inner products are computed with `dot2`, attaining high
+ *relative* accuracy on the singular values of ill-conditioned matrices.
+ `numpy_gesdd` (LAPACK) remains the default backend.
+- `tests/test_act_accuracy.py` — accuracy regression tests that lock the
+ whitepaper's summation (§5.2/5.3), dot-product (§4.6) and SVD (§4.3) claims
+ against exact `fractions.Fraction` / NumPy references.
+
+### Changed
+- `numpy_integration.compensated_dot_product` now returns the correctly-rounded
+ `dot2` result. The previous implementation summed naively-rounded products and
+ recovered **zero** correct digits on ill-conditioned dot products; it now
+ matches the exact result to full float64 precision regardless of condition
+ number (as long as individual products are finite).
+- `docs/research/ACT_WHITEPAPER_v1.md` reconciled with measured behaviour:
+ Theorem 1 reframed as accumulation stability (pairwise recovery is impossible
+ by the Sterbenz lemma); §4.3 documents the two real SVD backends (removing the
+ earlier Golub–Kahan claim); §4.6 documents the correctly-rounded Dot2; §5.2/§5.4
+ tables carry the measured figures; §3.5/§8.2 state precisely what Lean proves
+ (the algebra of the ℝ-isomorphic idealized model, `sorry`-free, `#print axioms`
+ clean) versus what is validated empirically (float64 stability).
+
+### Removed
+- `docs/research/PATENT_DRAFT_ACT.md` and all patent references from the research
+ index and scope documents. Balansis pursues no patent; the work is released
+ under the existing dual AGPL-3.0 / commercial license.
+
+### Verified
+- Lean4 formal audit: `lake build` completes with **0 errors / 0 `sorry`**
+ (8041 jobs) on Mathlib `v4.28.0`; `#print axioms` on A1/A3, S1–S3 and the
+ `Field EternalRatio` instance shows only `[propext, Classical.choice, Quot.sound]`
+ — no `sorryAx`.
+- `tests/test_act_accuracy.py` passes: TwoSum/TwoProduct exact vs `Fraction`;
+ `dot2` and `compensated_dot_product` recover a condition-~1e17 dot product to
+ <1e-14 relative error where naive `np.dot` exceeds 1e-2; `act_jacobi` SVD
+ reconstruction/orthogonality <1e-12 and small-singular-value relative accuracy
+ within 10%.
+
+---
+
+## [1.0.0] — 2026-07-06 — Stable Release
+
+### Added
+- Promoted Balansis to a stable `1.0.0` package release with production/stable PyPI classifiers
+- Added the `balansis` console entrypoint for `pipx` and CLI smoke checks
+- Added `balansis doctor` and `balansis add` commands for installation verification and basic ACT operations
+- Added `ExtendedRatio` singular arithmetic runtime policy support and high-level telemetry propagation
+- Added runtime-to-Lean parity tests for `ExtendedRatio` semantic laws
+
+### Changed
+- Hardened PyPI/TestPyPI release workflow and installation smoke checks across Python 3.10, 3.11, and 3.12
+- Updated installation documentation for `pip`, `pipx`, wheel, and source installs
+- Updated package metadata to describe the stable formal/runtime surface
+- Reworked repository licensing into a canonical dual-license layout with root `LICENSE`, `LICENSING.md`, and `COMMERCIAL_LICENSE.md`
+- Established a visible documentation architecture under `docs/`, moved legacy and research material out of the main canonical path, and redesigned the README as a value-first navigation hub
+
+### Verified
+- `pip install` from local wheel
+- `pipx install` from local wheel
+- CLI `balansis --version`, `balansis doctor`, and `balansis add`
+- `twine check` for built distributions
+- Lean formal audit through `lake build` and `FormalAudit.lean`
+
+---
+
+## [0.6.1] — 2026-06-11 — Drift Alignment Edition
+
+### Changed
+- Unified package, subpackage, API, and documentation metadata on version `0.6.1`
+- Restored compatibility shims for legacy `tnsim` import paths and Balansis integration symbols
+- Aligned public documentation with the current coverage gate (`85%`) and active packaging metadata
+
+---
+
+## [0.2.0] — 2026-02-18 — Lean4 Formal Verification Edition
+
+### Added
+
+#### Lean4 Formal Proofs (`formal/`)
+Initial repository integration of the Lean4 ACT formalization using Mathlib.
+This historical entry marks the first formal-proof milestone and was later
+superseded by the stronger stable proof architecture, which now builds both
+`BalansisFormal` and `ACT` and documents the public theorems A1–A5, E1–E4,
+and S1–S3 directly.
+
+- Introduced the `formal/` Lean project and Mathlib toolchain
+- Added the first machine-checked ACT proof modules
+- Wired formal build instructions into repository documentation
+
+#### CI/CD
+- `qa-gates.yml` in StudyNinja-Eco: lean-formal job now builds Balansis formal proofs in matrix strategy alongside MagicBrain
+
+### Infrastructure
+- `.gitignore` created for Python + Lean4 build artifacts
+- Remote URL migrated to SSH + XTeam-Pro organization
+- `development` branch established as default for active work
+
+---
+
+## [0.1.0] — 2025-01-XX — Initial Release
+
+### Added
+- Initial implementation of Absolute Compensation Theory (ACT)
+- Core mathematical components:
+ - `AbsoluteValue` class with magnitude and direction
+ - `EternalRatio` class for stable fraction representation
+ - `Compensator` engine for numerical stability
+- Runtime algebra helpers:
+ - `AbsoluteGroup` implementation for structured group-style runtime workflows
+ - `EternityField` implementation for structured field-style runtime workflows
+- Compensated arithmetic operations: `compensated_add`, `compensated_multiply`, `compensated_divide`, `compensated_power`
+- Near-cancellation detection (threshold 1e-15), overflow/underflow protection
+- `sequence_sum` (Kahan-compensated), `sequence_product`
+- Linear algebra: `gemm.py` (compensated GEMM), `svd.py` (Golub-Kahan + QR), `qr.py` (Householder/Givens/Gram-Schmidt)
+- ML optimizer: `EternalOptimizer`, `AdaptiveEternalOptimizer`, `EternalTorchOptimizer` (PyTorch subclass)
+- Finance module: `finance/ledger.py` (exact cancellation accounting)
+- NumPy integration: `numpy_integration.py` (vectorized ACT ops)
+- Memory: `memory/arena.py` (value pooling)
+- Initial Lean4 formal layer integration: early `formal/ACT/*` proof modules
+- Comprehensive test suite with ≥95% coverage
+- Example Jupyter notebooks demonstrating core concepts
+- Poetry-based dependency management
+- Type safety with MyPy strict mode
+- Code quality tools: Black, isort, flake8, bandit, codespell, interrogate
+- Theoretical documentation:
+ - `docs/research/ACT_WHITEPAPER_v1.md` — retained historical whitepaper and axiomatic research material
+ - `docs/archive/legacy/algebraic_proofs.ru.md` — retained historical algebraic proof notes
+ - `docs/guides/precision-and-stability.md` — canonical guide entry for precision and stability topics
+
+### Security
+- No known security vulnerabilities in initial release
+
+---
+
+## Versioning Policy
+
+This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+### API Stability Guarantees
+
+| API Layer | Stability |
+|-----------|-----------|
+| Core types (`AbsoluteValue`, `EternalRatio`) | Stable — MAJOR version only |
+| Runtime algebra helpers (`AbsoluteGroup`, `EternityField`) | Stable — MAJOR version only |
+| Compensated operations | Stable — MAJOR version only |
+| Utility functions, integration patterns | Evolving — MINOR version |
+| Lean4 formal layer | Evolving — MINOR version |
+| Private methods, test utilities | No guarantees |
+
+### Deprecation Policy
+
+Features marked for removal will:
+1. Be deprecated for at least one MINOR version with warnings
+2. Have migration paths documented in the changelog
+3. Be removed only in MAJOR releases
+
+---
+
+*This changelog helps users and developers track the evolution of Balansis and make informed decisions about upgrades and compatibility.*
+
+# Balansis Documentation
+
+**Audience:** all readers 
+**Status:** canonical 
+**Source of truth:** this `docs/` tree and the repository root governance files
+
+Balansis documentation is organized by audience and by task:
+
+- **Decision makers:** start with [Why Balansis](getting-started/why-balansis.md)
+- **Developers:** start with [Quick Start](getting-started/quickstart.md) and [API Reference](api/index.md)
+- **Researchers:** start with [Mathematics](mathematics/index.md) and [Formal Verification](formal/overview.md)
+- **Contributors:** start with [Contributing](../CONTRIBUTING.md), [Release Process](release.md), [Documentation Standards](standards.md), and [Contributor Docs](contributor/development-setup.md)
+
+## Sections
+
+- [Getting Started](getting-started/why-balansis.md): value proposition, installation, quick start, adoption paths
+- [Concepts](concepts/index.md): the core vocabulary of ACT and the Balansis runtime model
+- [Guides](guides/index.md): usage patterns for finance, scientific computing, simulations, and integrations
+- [Architecture](architecture/index.md): repository map, library structure, formal-layer layout, and documentation system
+- [API Reference](api/index.md): code-backed reference for the shipped Python surface
+- [Mathematics](mathematics/index.md): ACT definitions, notation, algebraic structure, and proof-oriented material
+- [Formal Verification](formal/overview.md): Lean architecture, theorem map, and verification commands
+- [Examples](examples/index.md): runnable notebooks and example walkthroughs
+- [Benchmarks](benchmarks/index.md): methodology, scenarios, and result interpretation
+- [TNSIM](tnsim/overview.md): overview and status of the zero-sum infinite sets subproject
+- [Contributor Docs](contributor/development-setup.md): development workflow, testing, release process, and documentation maintenance
+- [Research](research/index.md): whitepapers and non-canonical research material
+- [Archive](archive/legacy/README.md): retained but non-canonical legacy material
+
+## Documentation Governance
+
+- [Glossary](glossary.md): canonical terminology and naming boundaries
+- [Documentation Standards](standards.md): file, language, linking, and governance rules
+- [Reading Paths](concepts/reading-paths.md): audience-specific routes through the docs tree
+
+## Canonical Language
+
+English is the canonical source language for public documentation. Future
+translations should be derived from the English versions and stored separately
+from the canonical tree.
+
+## Status Labels
+
+Use these labels consistently across documentation:
+
+- **canonical**: current source of truth for a topic
+- **derived**: adapted from a canonical source for a specific audience
+- **research**: exploratory or publication-oriented material
+- **draft**: incomplete working document
+- **archived**: retained for history, not authoritative
+
+# Balansis Glossary
+
+**Audience:** all readers 
+**Status:** canonical
+
+## Core Terms
+
+### Balansis
+
+The Python library implementing Absolute Compensation Theory (ACT) as a
+numerical computing runtime and experimentation surface.
+
+### Absolute Compensation Theory (ACT)
+
+The mathematical framework behind Balansis. ACT replaces unstable floating-point
+edge behavior with explicit structured objects and algebraic laws.
+
+### AbsoluteValue
+
+The core signed-magnitude runtime object in Balansis. It combines a
+non-negative magnitude with a direction and supports ACT-aware arithmetic.
+
+### ABSOLUTE
+
+The ACT additive identity used by the runtime model. It is a mathematical and
+structural concept in Balansis documentation and should not be described as a
+drop-in synonym for every use of IEEE 754 zero.
+
+### EternalRatio
+
+A structured ratio object used instead of unstable division edge behavior. In
+the formal layer it is represented through a quotient construction; in the
+runtime layer it is the stable ratio abstraction exposed to Python users.
+
+### ExtendedRatio
+
+The wider runtime ratio object for singular arithmetic. It keeps explicit
+`finite`, `infinite`, and `indeterminate` states when division edge cases must
+be preserved as data instead of rejected immediately.
+
+### Compensation Factor
+
+The explicit auxiliary value returned by low-level compensated operations to
+make error handling visible rather than implicit.
+
+### Compensator
+
+The higher-level Balansis engine that exposes compensation-aware operations in a
+friendlier interface than the low-level tuple-returning primitives.
+
+### BalansisFormal
+
+The constructive Lean layer containing the internal formal core and technical
+lemmas.
+
+### ACT (Lean Layer)
+
+The public Lean theorem layer that re-exports the proved ACT statements from
+`BalansisFormal`.
+
+### TNSIM
+
+The zero-sum infinite sets subproject maintained inside this repository. It has
+its own runtime and docs surface, but it is not the canonical entrypoint for
+the Balansis Python package.
+
+### Canonical Document
+
+The current source of truth for a topic.
+
+### Derived Document
+
+A document adapted from canonical material for a specific audience, format, or
+delivery channel.
+
+### Archived Document
+
+A retained historical document that is no longer authoritative.
+
+## Terminology Boundaries
+
+### `ABSOLUTE` vs "additive identity"
+
+Use `ABSOLUTE` when referring to the Python runtime constant. Use "additive
+identity" when describing the mathematical role in theory or formal proofs.
+
+### `EternalRatio` vs `Eternity`
+
+Use `EternalRatio` in canonical documentation for the ratio object and its
+formal counterpart. Use `Eternity` only when quoting or describing historical
+materials, old file names, or legacy runtime naming.
+
+### `EternalRatio` vs `ExtendedRatio`
+
+Use `EternalRatio` for the strict finite ratio object. Use `ExtendedRatio` for
+the opt-in runtime surface that represents singular states such as signed
+infinity and indeterminate division results.
+
+### `BalansisFormal` vs `ACT`
+
+Use `BalansisFormal` for the constructive Lean implementation layer. Use `ACT`
+for the public theorem-facing Lean layer that states the proved theorem
+surface.
+
+### Runtime algebra names vs theorem names
+
+Runtime classes such as `AbsoluteGroup` and `EternityField` are Python module
+names. They must not replace the canonical mathematical names of the objects
+described in reader-facing theory documentation.
