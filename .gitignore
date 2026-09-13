@@ -4,3 +4,7 @@ var/
 .env.build
 __pycache__/
 *.pyc
+
+# Локальный override с собственным паролем стенда
+docker-compose.local-auth.yml
+secrets/
